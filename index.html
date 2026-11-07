@@ -301,6 +301,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3
         <ul>
             <li>Click <b>👹 Monsters &amp; objects</b>, pick a tab (Monsters, Objects, Exits) and an entry, then click the map. Right-click or <kbd>Del</kbd> deletes, drag moves.</li>
             <li><b>Bosses &amp; super uniques</b>: every act's list also has all five act bosses. A monster from another act (or <b>Act list</b> set to another act) is added as a new monster row: the export lists the rows your mod must add.</li>
+            <li><b>Uber bosses</b> (Uber Mephisto, Diablo, Baal, Lilith, Duriel, Izual, the Diablo Clone) are placed the same way, as new monster rows. 🧪 Untested in game: without the Uber Tristram scripts they may have no minions and drop no Hellfire Torch.</li>
             <li><b>🎲 Scatter spawn points</b> puts champion packs and monster groups on walkable floor.</li>
             <li><b>Exits</b> lead to other levels; your mod links exit <i>N</i> with levels.txt Vis<i>N</i>/Warp<i>N</i>. Waypoints don't travel in a new level.</li>
         </ul>
@@ -519,6 +520,7 @@ function monsterInfo(raw) {
     if (SPAWN_NAMES[raw]) return { label: SPAWN_NAMES[raw], cat: 'Spawn points' };
     if (/^place_/.test(raw)) return { label: 'Spawn: ' + humanize(raw), cat: 'Spawn points' };
     if (/^trap/i.test(raw)) return { label: 'Trap: ' + humanize(raw.replace(/^trap-?/i, '')), cat: 'Spawn points' };
+    if (UBER_NAME[raw]) return { label: UBER_NAME[raw] + ' 🧪 untested', cat: 'Uber bosses', risky: true };
     if (QUEST_BOSS.test(raw)) return { label: humanize(raw) + ' ⚠ quest boss', cat: 'Bosses & super uniques', risky: true };
     if (/^[A-Z]/.test(raw) || BOSS.test(raw)) return { label: /^[A-Z]/.test(raw) ? raw : humanize(raw), cat: 'Bosses & super uniques' };
     return { label: humanize(raw), cat: 'NPCs & other' };
@@ -552,13 +554,22 @@ function mainBossItems(act) { // the act bosses that act's own list doesn't have
         return id < 0 ? null : { type: 1, id, raw, fromAct: a, label: `${name} (Act ${a + 1} boss) ⚠ quest boss`, cat: 'Bosses & super uniques', risky: true };
     }).filter(Boolean);
 }
+// Uber bosses: monsters of monstats.txt that no map places (the Uber Tristram / Pandemonium scripts
+// spawn them). Placed like other-act monsters: a new monpreset.txt row with their monstats id.
+// Untested in game: without those scripts they may lack their minions and the Hellfire Torch drop.
+const UBER_BOSSES = [['ubermephisto', 'Uber Mephisto'], ['uberdiablo', 'Uber Diablo (Pandemonium)'], ['uberbaal', 'Uber Baal'],
+    ['uberandariel', 'Lilith'], ['uberduriel', 'Uber Duriel'], ['uberizual', 'Uber Izual'], ['diabloclone', 'Diablo Clone (Uber Diablo)']];
+const UBER_NAME = Object.fromEntries(UBER_BOSSES);
+const uberItems = () => UBER_BOSSES.map(([raw, name], k) => ({ type: 1, id: 1000 + k, raw, fromAct: 'uber', label: `${name} 🧪 untested`, cat: 'Uber bosses', risky: true }));
+// the picker entry a brush stands for (an act's list, or the uber list)
+const brushItem = b => b.act === 'uber' ? uberItems().find(x => x.raw === b.raw) : catalog(b.type, b.act ?? map.act).find(x => x.id === b.id);
 function objLabel(o) {
     const raw = objName(o);
     if (!raw) return null;
     return o.type === 1 ? monsterInfo(raw).label : objectInfo(raw).label;
 }
 const CAT_COLORS = {
-    'Spawn points': '#e07a3c', 'Bosses & super uniques': '#e8c547', 'NPCs & other': '#d0503c',
+    'Spawn points': '#e07a3c', 'Bosses & super uniques': '#e8c547', 'Uber bosses': '#ff4fd8', 'NPCs & other': '#d0503c',
     'Chests & stashes': '#c99a4d', 'Shrines & wells': '#5fc0d8', 'Waypoints, doors & portals': '#a77be0',
     'Torches & fire': '#f08a3a', 'Barrels, jars & urns': '#8d7b62', 'Decor & other': '#4d8fd6', 'Exits': '#1e8c46',
 };
@@ -1217,7 +1228,14 @@ let walkOn = true, walkVer = 0, walkCache = null;
 function walkMasks() { // per cell: 25-bit blocked mask, -1 = no floor (nothing to stand on)
     if (walkCache && walkCache.ver === walkVer && walkCache.map === map && walkCache.tiles === tileLookup) return walkCache.a;
     const a = new Int32Array(map.width * map.height);
-    for (let y = 0; y < map.height; y++) for (let x = 0; x < map.width; x++) { const b = cellBlock(x, y); a[y * map.width + x] = b === null ? -1 : (b & 0x1FFFFFF); }
+    // FillBlanks 1 fills every cell whose FIRST floor layer is empty with the game's blocking Blank
+    // tile, even when a second floor layer has ground there (the Hellforge's platform: 64 cells)
+    const fb = fillBlanksOn(), f0 = map.floors[0];
+    for (let y = 0; y < map.height; y++) for (let x = 0; x < map.width; x++) {
+        const c = y * map.width + x;
+        if (fb && f0 && DS1.isEmpty(f0[c])) { a[c] = 0x1FFFFFF; continue; }
+        const b = cellBlock(x, y); a[c] = b === null ? -1 : (b & 0x1FFFFFF);
+    }
     walkCache = { ver: walkVer, map, tiles: tileLookup, a };
     return a;
 }
@@ -1227,13 +1245,14 @@ function drawWalkable(r) {
     const onScreen = (x, y) => { const [px, py] = proj(x + .5, y + .5); return px > -m && py > -m && px < r.width + m && py < r.height + m; };
     const sub = (fx, fy, s = .2) => { const pts = [proj(fx, fy), proj(fx + s, fy), proj(fx + s, fy + s), proj(fx, fy + s)]; ctx.moveTo(...pts[0]); for (let i = 1; i < 4; i++) ctx.lineTo(...pts[i]); ctx.closePath(); };
     ctx.beginPath(); // walkable ground (whole or partly): green
-    for (let y = 0; y < map.height; y++) for (let x = 0; x < W; x++) { const b = a[y * W + x]; if (b >= 0 && b !== 0x1FFFFFF && onScreen(x, y)) sub(x, y, 1); }
+    const fb = fillBlanksOn();
+    for (let y = 0; y < map.height; y++) for (let x = 0; x < W; x++) { const b = a[y * W + x]; if ((b >= 0 ? b !== 0x1FFFFFF : !fb) && onScreen(x, y)) sub(x, y, 1); }
     ctx.fillStyle = 'rgba(60,230,100,.25)'; ctx.fill();
     ctx.beginPath(); // blocked
     const part = [];
     for (let y = 0; y < map.height; y++) for (let x = 0; x < W; x++) {
         const b = a[y * W + x];
-        if (b === 0 || !onScreen(x, y)) continue;
+        if (b === 0 || (b < 0 && !fb) || !onScreen(x, y)) continue;
         if (b === 0x1FFFFFF || b < 0) { sub(x, y, 1); continue; } // whole cell blocked; no floor: blank tile (FillBlanks 1)
         if (!fine) { part.push([x, y]); continue; }
         for (let row = 0; row < 5; row++) for (let col = 0; col < 5; col++) if (b & (1 << ((4 - row) * 5 + col))) sub(x + col / 5, y + row / 5);
@@ -1241,9 +1260,14 @@ function drawWalkable(r) {
     ctx.fillStyle = 'rgba(230,0,30,.55)'; ctx.fill();
     if (part.length) { ctx.beginPath(); for (const [x, y] of part) sub(x, y, 1); ctx.fillStyle = 'rgba(255,140,40,.35)'; ctx.fill(); } // zoomed out: partly blocked cells
 }
+// whether the game will fill floorless cells with its blocking Blank tile (lvlprest FillBlanks 1).
+// The source rooms decide: most use 1, but the Hellforge and River of Flame rooms use 0, and their
+// floorless cells are walkable ground drawn by HD (the forge platform): 1 there walls it off.
+const fillBlanksOn = () => lvlprestFlags({ flags: sourceFlags(), blanks: 1 }).FillBlanks === 1;
 function walkSummary(x, y) {
     const b = walkMasks()[y * map.width + x];
-    if (b < 0) return '⛔ no floor: blocked by the Blank tile with lvlprest FillBlanks 1 (the export sets it); with 0 it is open void';
+    if (fillBlanksOn() && DS1.isEmpty(map.floors[0][y * map.width + x])) return '⛔ blocked: floor layer 1 is empty here, and FillBlanks 1 fills it with the game\'s Blank tile' + (map.floors.some(a => !DS1.isEmpty(a[y * map.width + x])) ? ' (even though another floor layer has ground)' : '');
+    if (b < 0) return fillBlanksOn() ? '⛔ no floor: blocked (FillBlanks 1 fills it with the game\'s Blank tile)' : '✓ no floor, walkable (FillBlanks 0, as the source rooms: HD draws the ground here)';
     let n = 0; for (let i = 0; i < 25; i++) if (b & (1 << i)) n++;
     return n === 0 ? '✓ walkable' : n === 25 ? '⛔ blocked' : `${25 - n}/25 sub-tiles walkable`;
 }
@@ -1259,7 +1283,7 @@ function renderPicker() {
     if (!map) return;
     const act = pickAct ?? map.act;
     const items = catalog(pickKind, act);
-    if (pickKind === 1) items.push(...mainBossItems(act));
+    if (pickKind === 1) items.push(...mainBossItems(act), ...uberItems());
     document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', Number(b.dataset.kind) === pickKind));
     const cats = ['All', ...new Set(items.map(i => i.cat))];
     if (!cats.includes(pickCat)) pickCat = 'All';
@@ -1301,7 +1325,7 @@ function renderPicker() {
             for (const i of catalog(pickKind, a)) if (i.label.toLowerCase().includes(q) || i.raw.toLowerCase().includes(q)) elsewhere.push(`${i.label} (Act ${a + 1})`);
         }
         if (elsewhere.length) hint += `<div class="acthint">In other acts' lists: <b>${[...new Set(elsewhere)].slice(0, 8).join(', ')}</b>${elsewhere.length > 8 ? '…' : ''}. Switch <b>Act list</b> below to that act to place it.</div>`;
-        if (/uber|über/.test(q)) hint += '<div class="acthint">Uber bosses (Uber Mephisto, Uber Diablo, Uber Baal, Lilith, Uber Duriel, Uber Izual) aren\'t map presets in the game: they\'re spawned by the Uber Tristram / Pandemonium scripts, so they can\'t be placed on a map.</div>';
+        if (/uber|über|lilith|clone/.test(q)) hint += '<div class="acthint"><b>Uber bosses</b> aren\'t map presets in the game: the Uber Tristram / Pandemonium scripts spawn them. Here they go in as new monpreset.txt rows with their monstats.txt id (Export lists them). 🧪 Untested in game: without those scripts they may have no minions, and killing them drops no Hellfire Torch.</div>';
     }
     list.insertAdjacentHTML('afterbegin', hint);
     $('objAct').innerHTML = '';
@@ -1314,6 +1338,7 @@ function setObjBrush(i) {
     if (tool !== 'object') setTool('object');
     renderPicker();
     const other = objBrush.act !== map.act && i.type !== 3;
+    if (objBrush.act === 'uber') return status(`🧪 ${UBER_NAME[i.raw]}: placing it adds "${i.raw}" (its monstats.txt id) as a new row of Act ${map.act + 1}'s monster list; your mod must add that row (Export lists it). Untested in game: without the Uber Tristram scripts it may have no minions and drop no Hellfire Torch.`);
     if (other && i.type === 1 && !(G.monpreset[map.act] || []).includes(i.raw)) return status(`${i.raw} (Act ${objBrush.act + 1}): placing it adds it as a new row of Act ${map.act + 1}'s monster list; your mod must add that row (Export lists it).${i.risky ? ' ⚠ An act/quest boss: its death runs quest code.' : ''}`);
     if (other && i.type === 2 && !catalog(2, map.act).some(x => x.raw === i.raw)) return status(`${i.raw} isn't in Act ${map.act + 1}'s object list: objects can only come from the map's own act.`);
     status(i.risky ? `⚠ ${i.raw}: an act/quest boss. Its death runs quest code (seals, end of act) and may misbehave outside its own level. Click the map to place it anyway.`
@@ -1322,8 +1347,9 @@ function setObjBrush(i) {
 function showBrush() {
     const el = $('objBrush');
     if (!objBrush) { el.innerHTML = 'Nothing yet <small>pick a monster or object below</small>'; return; }
-    const i = catalog(objBrush.type, objBrush.act ?? map.act).find(x => x.id === objBrush.id);
+    const i = brushItem(objBrush);
     el.innerHTML = i && i.type === 3 ? `<span style="color:#8ff0b0">🪜</span> ${i.label}<small>exit tile ${i.id} (levels.txt Vis${i.id} / Warp${i.id}) · click the map</small>`
+        : i && objBrush.act === 'uber' ? `<span style="color:${CAT_COLORS[i.cat]}">●</span> ${i.label}<small>${i.cat} · ${i.raw} (a new monpreset.txt row) · click the map</small>`
         : i ? `<span style="color:${CAT_COLORS[i.cat]}">${i.type === 1 ? '●' : '■'}</span> ${i.label}<small>${i.cat} · ${i.raw} (${i.type === 1 ? 'monster' : 'object'} id ${i.id}) · click the map</small>`
         : `id ${objBrush.id} <small class="warn">not in Act ${map.act + 1}'s list</small>`;
 }
@@ -2595,7 +2621,8 @@ function runChecks() {
     const sf = sourceFlags();
     if (sf && sf.mixedLogicals) lines.push(`<span class="warn">⚠ The map's rooms come from presets with different Logicals values: the level can only have one.</span>`);
     const nb = blankCells();
-    if (nb) lines.push(`⬛ ${nb} cell(s) have no floor: they block in game only with lvlprest <b>FillBlanks 1</b> (the export lists it). With 0 they are open void: monsters spawn there and players teleport in.`);
+    if (nb) lines.push(fillBlanksOn() ? `⬛ ${nb} cell(s) have an empty first floor layer: they block in game with lvlprest <b>FillBlanks 1</b>, as the source rooms use (the export lists it). With 0 they'd be open void: monsters spawn there and players teleport in.`
+        : `⬛ ${nb} cell(s) have an empty first floor layer and stay walkable: the source rooms use lvlprest <b>FillBlanks 0</b> (HD draws ground there, e.g. the Hellforge's platform). With 1 they'd become invisible walls.`);
     const xm = extraMon();
     if (xm.length) lines.push(`👹 Monsters from other acts: ${xm.join(', ')}. Your mod adds them as new rows of Act ${map.act + 1}'s monster list (monpreset.txt; the export lists them). Untested in game.`);
     const lt = Number($('xLevelType').value) || 0, mk = Number($('xDt1Mask').value) || 0;
@@ -2658,10 +2685,11 @@ function lvlprestFlags(s) {
     const f = s.flags;
     const fl = f ? { Populate: 1, Logicals: f.Logicals, Outdoors: f.Outdoors, Animate: f.Animate, KillEdge: f.KillEdge, FillBlanks: f.FillBlanks }
         : { Populate: 1, Logicals: 0, Outdoors: 0, Animate: 1, KillEdge: 0, FillBlanks: 1 };
-    if (s.blanks) fl.FillBlanks = 1;
+    if (s.blanks && !f) fl.FillBlanks = 1; // unknown source: block the floorless cells
     return fl;
 }
-const blankCells = () => map ? map.floors[0].reduce((n, v, c) => n + (map.floors.every(a => DS1.isEmpty(a[c])) ? 1 : 0), 0) : 0;
+// cells FillBlanks acts on: the first floor layer is empty (a second layer may still have ground)
+const blankCells = () => map ? map.floors[0].reduce((n, v) => n + (DS1.isEmpty(v) ? 1 : 0), 0) : 0;
 // D2RMM code that adds the lvlprest.txt row. lvlprest.txt has Windows line ends, so D2RMM reads
 // its last column as 'Dt1Mask\r': a row written with a plain 'Dt1Mask' key loses its mask, the
 // level loads none of its tile files, every wall becomes a blank tile and players walk through
@@ -2691,7 +2719,9 @@ function lvlprestLine(s) {
     const f = s.flags, fl = lvlprestFlags(s);
     return `                ${Object.entries(fl).map(([k, v]) => `${k} ${v}`).join('   ')}\n` +
         (f ? `                (as the game's ${f.names.slice(0, 2).join(', ')}${f.names.length > 2 ? ' …' : ''})` : '') +
-        (s.blanks ? `${f ? '\n' : ''}                FillBlanks 1: ${s.blanks} cell(s) have no floor. The game fills them with its Blank tile, which blocks;\n                with 0 they are open void (monsters spawn there, players teleport in)` : '');
+        (s.blanks ? `${f ? '\n' : ''}                FillBlanks ${lvlprestFlags(s).FillBlanks}: ${s.blanks} cell(s) have an empty first floor layer. ` + (lvlprestFlags(s).FillBlanks
+            ? 'The game fills them with its Blank tile, which blocks.'
+            : 'They stay walkable (HD draws ground there);\n                1 would turn them into invisible walls.') : '');
 }
 function exportMsg(html, cls) { $('xMsg').innerHTML = html; $('xMsg').className = 'msg ' + (cls || ''); }
 function showSettings(settings, name) {

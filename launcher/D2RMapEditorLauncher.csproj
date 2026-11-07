@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <!-- Build: dotnet publish launcher\D2RMapEditorLauncher.csproj -c Release -o . (from the editor's folder)
        or double-click "launcher\Build exe.cmd". Gives "D2R Map Editor.exe" next to index.html. -->
   <PropertyGroup>
@@ -21,6 +21,6 @@
     <DebugType>none</DebugType>
     <Product>D2R Map Editor</Product>
     <Description>Fan-made map editor for Diablo II: Resurrected. Not affiliated with Blizzard Entertainment.</Description>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
   </PropertyGroup>
 </Project>
