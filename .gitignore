@@ -1,0 +1,13 @@
+# Made from the game's own files by tools/extract-game-files.py: Blizzard's data, never publish
+game/
+gamedata.js
+
+# Granny/CascLib binaries, if someone drops them next to the tools
+*.dll
+
+# editor/OS clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+node_modules/
+tools/d2r-path.txt
