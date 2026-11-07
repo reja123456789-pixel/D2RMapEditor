@@ -11,3 +11,9 @@ Thumbs.db
 desktop.ini
 node_modules/
 tools/d2r-path.txt
+
+# the built exe and release zips (made by launcher\Build exe.cmd and tools\make-release.ps1)
+D2R Map Editor.exe
+launcher/bin/
+launcher/obj/
+dist/

@@ -7,11 +7,13 @@ You make maps with it; a mod (yours, or anyone's) puts them in the game.
 *A fan-made tool, not for profit. Not affiliated with or endorsed by Blizzard Entertainment.*
 
 ## Start
-Double-click **`Start Map Editor.cmd`**. The first time it finds your D2R folder (or asks for it), makes the game data from your install (about a minute, see below), then opens the editor in Chrome or Edge. Afterwards it just opens the editor. It also redoes the game data by itself when an editor update needs more of it.
+**Release zip (Nexus / GitHub releases):** unzip anywhere and double-click **`D2R Map Editor.exe`**. Nothing to install: no Python, no .NET. The first time it finds your D2R folder (or asks for it), makes the game data from your own install (under a minute), then opens the editor in Chrome or Edge. Afterwards it just opens the editor. After a Diablo II: Resurrected patch, double-click **`Update game data.cmd`**.
 
-After a Diablo II: Resurrected patch, double-click **`Update game data.cmd`**.
+**From the source (this repository):** double-click **`Start Map Editor.cmd`**. Without the exe it makes the game data with Python 3 (see below). To build the exe yourself (.NET 8 SDK): `launcher\Build exe.cmd`; `tools\make-release.ps1` builds it and packs the release zip into `dist\`.
 
 In the editor, **📖 Manual** (top right, or F1) explains the steps from getting a map to putting it in the game with D2RMM, including a ready-to-copy example `mod.js`.
+
+The release includes `CascLib.dll` (Ladislav Zezula's CascLib, MIT license: `CascLib-LICENSE.txt`), which reads the game's file storage.
 
 ## Setup (what the start does; by hand if you prefer)
 You need:
