@@ -21,6 +21,6 @@
     <DebugType>none</DebugType>
     <Product>D2R Map Editor</Product>
     <Description>Fan-made map editor for Diablo II: Resurrected. Not affiliated with Blizzard Entertainment.</Description>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
   </PropertyGroup>
 </Project>

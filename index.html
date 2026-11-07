@@ -604,6 +604,32 @@ function addExitFx(x, y) {
     parts.particles = parts.particles || [];
     if (!parts.particles.some(d => (d.path || '').toLowerCase() === EXIT_FX.toLowerCase())) parts.particles.push({ path: EXIT_FX });
 }
+// every exit tile gets its red glow in the HD file (an HD file rebuilt from the game's rooms, e.g. a
+// saved .ds1 opened without its .json, has none): add the missing ones and the particles dependency.
+// Glows already there are kept, never duplicated. Returns how many were added.
+function ensureExitGlows(hd) {
+    if (!hd || !map) return 0;
+    const ents = hd.entities = hd.entities || [];
+    const has = (x, y) => ents.some(e => isPortalFx(e) && (c => c && c[0] === x && c[1] === y)(entCell(e)));
+    let n = 0;
+    for (const t of exitTiles()) {
+        if (t.sub || has(t.x, t.y)) continue;
+        const k = String(++n + ents.filter(isPortalFx).length).padStart(2, '0');
+        ents.push({
+            type: 'Entity', name: 'FX_TownPortal_Red_' + k, id: hdNextId++,
+            components: [
+                { type: 'TransformDefinitionComponent', name: 'FX_TownPortal_Red_' + k + '_Transform', position: { x: t.x * 10 + 5, y: 0, z: t.y * 10 + 5 }, orientation: { x: 0, y: 0, z: 0, w: 1 }, scale: { x: 1, y: 1, z: 1 }, inheritOnlyPosition: false },
+                { type: 'VfxDefinitionComponent', name: 'FX_TownPortal_Red_' + k + '_Vfx', filename: EXIT_FX, hardKillOnDestroy: false },
+            ],
+        });
+    }
+    if (ents.some(isPortalFx)) {
+        const parts = hd.dependencies = hd.dependencies || {};
+        parts.particles = parts.particles || [];
+        if (!parts.particles.some(d => (d.path || '').toLowerCase() === EXIT_FX.toLowerCase())) parts.particles.push({ path: EXIT_FX });
+    }
+    return n;
+}
 function removeExitFx(x, y) { if (map.hd) { const fx = exitFxAt(x, y); map.hd.entities = map.hd.entities.filter(e => !fx.includes(e)); } }
 // exit tiles come from act1\barracks\warp.tg1: the map's file list names it (as the game's maps with exits do)
 const WARP_FILE = '\\d2\\data\\global\\tiles\\act1\\barracks\\warp.tg1';
@@ -2671,8 +2697,12 @@ async function exportParts() {
     const hdFile = $('xHd').files[0];
     if (hdFile) {
         const bytes = new Uint8Array(await hdFile.arrayBuffer());
-        try { JSON.parse(new TextDecoder().decode(bytes)); hd = bytes; } catch (e) { problems.push('The HD file isn\'t valid JSON: ' + e.message); }
+        try {
+            const obj = JSON.parse(new TextDecoder().decode(bytes));
+            hd = ensureExitGlows(obj) ? hdBytes(obj) : bytes; // add any missing exit glows
+        } catch (e) { problems.push('The HD file isn\'t valid JSON: ' + e.message); }
     } else if (map.hd) {
+        ensureExitGlows(map.hd); // every exit tile keeps (or gets) its red glow
         hd = hdBytes(map.hd);
     }
     const settings = { levelType: tiles.levelType, pal: tiles.pal, width: map.width - 1, height: map.height - 1, dt1Mask: tiles.dt1Mask, act: map.act, extraMon: extraMon(), monBase: monBase(), flags: sourceFlags(), blanks: blankCells() };
