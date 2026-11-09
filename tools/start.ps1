@@ -50,6 +50,7 @@ function Test-GameData {
     foreach ($f in $gd, (Join-Path $root 'game\maps.js'), (Join-Path $root 'game\tiles.js')) { if (-not (Test-Path $f)) { return 'missing' } }
     # made by an older extractor: lacks the lvlprest flags the export lists
     if (-not (Select-String -Path $gd -Pattern '"flags":' -SimpleMatch -Quiet)) { return 'outdated' }
+    if (-not (Test-Path (Join-Path $root 'game\units.js'))) { return 'outdated' }  # no unit pictures yet
     return 'ok'
 }
 

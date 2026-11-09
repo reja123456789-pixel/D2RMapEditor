@@ -43,7 +43,8 @@ static class Program
         var gd = Path.Combine(Root, "gamedata.js");
         foreach (var f in new[] { gd, Path.Combine(Root, "game", "maps.js"), Path.Combine(Root, "game", "tiles.js") })
             if (!File.Exists(f)) return "missing";
-        return File.ReadAllText(gd).Contains("\"flags\":") ? "ok" : "outdated";
+        // made by an older version: no lvlprest flags, or no unit pictures
+        return File.ReadAllText(gd).Contains("\"flags\":") && File.Exists(Path.Combine(Root, "game", "units.js")) ? "ok" : "outdated";
     }
 
     static bool IsD2R(string dir) => !string.IsNullOrWhiteSpace(dir) && File.Exists(Path.Combine(dir, "D2R.exe"));

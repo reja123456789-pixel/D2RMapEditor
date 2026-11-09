@@ -29,6 +29,7 @@ python tools\extract-game-files.py "C:\Program Files (x86)\Diablo II Resurrected
 
 It takes under a minute. It reads the game's own files from **your** install and writes, next to `index.html`:
 - `gamedata.js`: the game tables the editor checks maps against,
+- `game/units.png` and `game/units.js`: a picture of every placeable monster and object,
 - `game\` (~150 MB): the game's 2,044 preset maps, their HD files (compressed), and the tile pictures.
 
 Then open `index.html` in Chrome or Edge.
@@ -90,6 +91,8 @@ So:
   - Right-click a stamp to remove it; undo works too.
 - **Tiles palette** (view only): the map's tiles with their real pictures and names, e.g. "Wall ↖ · Lava · Walls". The Cell panel names every layer of the cell under the mouse and the HD pieces on it.
 - 🏰 **Game view** shows the map as in the game; 🗺 **Grid view** is a flat grid.
+- **Pictures of monsters and objects** (Layers → Pictures, Game view): every monster, NPC, boss and object you place shows as its picture from the game's classic 2D sprites, and the Monsters / Objects lists show thumbnails. Spawn points (packs) stay markers. The pictures are made with the rest of the game data, on your PC.
+- **More room and light:** drag a side panel's inner edge to resize it (to the edge hides it, double-click toggles it); **⛶ Map only** or Tab hides both panels. **☀** sets the brightness of the tile and unit pictures. Both are remembered.
 - **Walkable overlay** (Layers, on by default): green = players can walk there in game, red = blocked, down to the 5×5 sub-tiles of each cell (wall lines show as thin red strips). Collision only comes from the .ds1; the HD picture has none, so wherever HD draws lava or rocks over green, players walk on it. The Cell panel shows the same ("in game: ✓ walkable / ⛔ blocked / 12/25 sub-tiles walkable").
 - **Lava:** the game's lava floor tiles block nothing by themselves. The .ds1 marks each open lava cell as unwalkable (bit 0x20000 of the floor cell), which the engine turns into wall collision on the whole cell. The overlay shows those cells red. The export also lists the source rooms' own lvlprest flags (Logicals, Outdoors, Animate, KillEdge, FillBlanks).
 - **Empty floor cells and FillBlanks:** lvlprest **FillBlanks 1** fills every cell whose first floor layer is empty with the game's Blank tile, which blocks all 25 sub-tiles, even where a second floor layer has ground. Most rooms use 1 (with 0 their empty cells are open void: monsters spawn there, players teleport in). The Hellforge and River of Flame rooms use 0: their floorless cells are ground drawn by HD (the Hellforge platform), and 1 would wall them off. The editor uses the source rooms' value, the overlay shows the result, and the export lists it.

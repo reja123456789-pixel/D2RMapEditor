@@ -11,7 +11,13 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.35 system-ui, "Segoe UI", sans-serif; }
-body { display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 250px 1fr 270px; grid-template-areas: "top top top" "left main right" "status status status"; }
+body { display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: var(--lw, 250px) 1fr var(--rw, 270px); grid-template-areas: "top top top" "left main right" "status status status"; }
+body.collapsed-left #left, body.collapsed-right #right { display: none; }
+.splitter { position: absolute; top: 0; bottom: 0; width: 7px; cursor: col-resize; z-index: 5; }
+.splitter:hover, .splitter.drag { background: rgba(200,164,90,.35); }
+#splitL { left: 0; } #splitR { right: 0; }
+#brightBox { display: inline-flex; align-items: center; gap: 4px; color: var(--dim); }
+#brightBox input { width: 80px; }
 header { grid-area: top; display: flex; gap: 6px; align-items: center; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 header h1 { font-size: 15px; margin: 0 12px 0 0; color: var(--accent); letter-spacing: .5px; }
 header .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
@@ -58,6 +64,8 @@ h2:first-child { margin-top: 0; }
 .pick.sel { background: var(--accent2); }
 .pick .ico { flex: 0 0 auto; width: 12px; height: 12px; border: 1px solid rgba(0,0,0,.8); }
 .pick .ico.m { border-radius: 50%; }
+.thumb { flex: 0 0 auto; display: inline-flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,.35); border-radius: 3px; overflow: hidden; }
+.thumb > span { display: block; image-rendering: auto; }
 .pick .nm { flex: 1; min-width: 0; }
 .pick .nm small { display: block; color: var(--dim); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pick .cnt { color: var(--dim); font-size: 10.5px; }
@@ -121,6 +129,8 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3
     <button id="btnResize" disabled title="Locked (HD-safe): the HD floor model can&#39;t change size, so a resized map wouldn&#39;t match in HD.">Resize…</button>
     <span class="sep"></span>
     <button id="btnView" title="Switch between the game's isometric view (real tile pictures) and a flat grid (V)">🗺 Grid view</button>
+    <label id="brightBox" title="Brightness of the game's tile and unit pictures">☀ <input type="range" id="bright" min="0.6" max="2.2" step="0.05"></label>
+    <button id="btnPanels" title="Hide both side panels to see more of the map; press again to show them (Tab). Drag a panel's edge to resize it.">⛶ Map only</button>
     <span class="sep"></span>
     <button id="btnExport" class="primary" disabled>Export map + HD…</button>
     <input type="file" id="fileOpen" accept=".ds1,.json" multiple hidden>
@@ -195,6 +205,8 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3
 
 <main id="main">
     <canvas id="view"></canvas>
+    <div class="splitter" id="splitL" title="Drag to resize the left panel (double-click: hide/show)"></div>
+    <div class="splitter" id="splitR" title="Drag to resize the right panel (double-click: hide/show)"></div>
     <div id="hdBanner" hidden></div>
     <div class="empty" id="empty"><div>
         <h3>Open a map to start</h3>
@@ -296,6 +308,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 3
             <li>Mouse wheel zooms, middle-drag or <kbd>Space</kbd>+drag pans. <b>🏰 Game view / 🗺 Grid view</b> (<kbd>V</kbd>) switches the view.</li>
             <li><b>Layers</b> (left) shows or hides floors, walls, objects and HD pieces. <b>Walkable in game</b>: green = players walk there, red = blocked (walls, lava, cells with no floor).</li>
             <li>The <b>Cell</b> panel (right) names every tile under the mouse and says if it is walkable in game.</li>
+            <li>In Game view, monsters, NPCs, bosses and objects show as their pictures (<b>Layers → Pictures</b> turns them off). <b>☀</b> sets the brightness; <b>⛶ Map only</b> or <kbd>Tab</kbd> hides the side panels, and dragging a panel's edge resizes it.</li>
         </ul>
         <h4>3. Place monsters, objects and exits</h4>
         <ul>
@@ -415,6 +428,7 @@ D2RMM.writeTsv('global\\excel\\cubemain.txt', cube);</pre>
             <span><kbd>Ctrl</kbd>+<kbd>O</kbd> / <kbd>Ctrl</kbd>+<kbd>S</kbd></span><span>open / save .ds1</span>
             <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></span><span>undo / redo</span>
             <span><kbd>V</kbd></span><span>game view / grid view</span>
+            <span><kbd>Tab</kbd>, ⛶ Map only</span><span>hide / show both side panels (drag a panel's edge to resize it; ☀ sets the pictures' brightness)</span>
             <span><kbd>Space</kbd>+drag, middle-drag</span><span>pan</span>
             <span><kbd>Del</kbd>, right-click</span><span>delete the selected monster or object</span>
             <span><kbd>F1</kbd></span><span>this manual</span>
@@ -494,6 +508,7 @@ D2RMM.writeTsv('global\\excel\\cubemain.txt', cube);</pre>
 <!-- made by tools/extract-game-files.py from the D2R install; optional -->
 <script src="game/maps.js" onerror="window.GAME_MAPS = null"></script>
 <script src="game/tiles.js" onerror="window.GAME_TILES = null"></script>
+<script src="game/units.js" onerror="window.GAME_UNITS = null"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
@@ -563,6 +578,30 @@ const UBER_NAME = Object.fromEntries(UBER_BOSSES);
 const uberItems = () => UBER_BOSSES.map(([raw, name], k) => ({ type: 1, id: 1000 + k, raw, fromAct: 'uber', label: `${name} 🧪 untested`, cat: 'Uber bosses', risky: true }));
 // the picker entry a brush stands for (an act's list, or the uber list)
 const brushItem = b => b.act === 'uber' ? uberItems().find(x => x.raw === b.raw) : catalog(b.type, b.act ?? map.act).find(x => x.id === b.id);
+// ------------------------------------------------------------------ unit pictures (game/units.js + units.png)
+// One standing picture per monster / object the lists can place, made from the game's classic 2D
+// sprites by the extractor: [x, y, w, h, ox, oy] in the sheet, ox/oy = top-left from the unit's feet.
+const unitSheet = window.GAME_UNITS ? Object.assign(new Image(), { src: GAME_UNITS.img }) : null;
+if (unitSheet) unitSheet.onload = () => { render(); if (typeof renderPicker === 'function' && map) renderPicker(); };
+const unitSheetReady = () => unitSheet && unitSheet.complete && unitSheet.naturalWidth > 0;
+const unitPic = (raw, type) => raw && window.GAME_UNITS ? (GAME_UNITS[type === 1 ? 'm' : 'o'] || {})[raw] || null : null;
+function drawUnitPic(raw, type, fx, fy, alpha) {
+    const p = unitPic(raw, type);
+    if (!p) return;
+    const k = view.cell / 80; // a game tile is 160 px wide, 2 * view.cell on screen
+    const [cx, cy] = proj(fx, fy);
+    ctx.globalAlpha = alpha;
+    ctx.imageSmoothingEnabled = k < 1;
+    ctx.drawImage(bright(unitSheet), p[0], p[1], p[2], p[3], cx + p[4] * k, cy + p[5] * k, p[2] * k, p[3] * k);
+    ctx.globalAlpha = 1;
+}
+// a small picture for the lists (a CSS sprite from the sheet), or '' if there is none
+function unitThumb(raw, type, size = 30) {
+    const p = unitSheetReady() && unitPic(raw, type);
+    if (!p) return '';
+    const k = Math.min(size / p[2], size / p[3], 1);
+    return `<span class="thumb" style="width:${size}px;height:${size}px"><span style="width:${p[2] * k}px;height:${p[3] * k}px;background:url(${GAME_UNITS.img}) -${p[0] * k}px -${p[1] * k}px/${unitSheet.naturalWidth * k}px auto no-repeat"></span></span>`;
+}
 function objLabel(o) {
     const raw = objName(o);
     if (!raw) return null;
@@ -1332,7 +1371,7 @@ function renderPicker() {
         const iAct = i.fromAct ?? act;
         el.className = 'pick' + (objBrush && objBrush.type === i.type && objBrush.id === i.id && (objBrush.act ?? map.act) === iAct ? ' sel' : '');
         const n = iAct === map.act ? counts[i.type + ':' + i.id] : map.objects.filter(o => o.type === i.type && objName(o) === i.raw).length;
-        el.innerHTML = `<span class="ico ${i.type === 1 ? 'm' : ''}" style="background:${CAT_COLORS[i.cat]}"></span>` +
+        el.innerHTML = (unitThumb(i.raw, i.type) || `<span class="ico ${i.type === 1 ? 'm' : ''}" style="background:${CAT_COLORS[i.cat]}"></span>`) +
             `<span class="nm">${i.label}<small>${i.raw} · id ${i.id}${pickCat === 'All' ? ' · ' + i.cat : ''}</small></span>` +
             (n ? `<span class="cnt" title="on the map">×${n}</span>` : '');
         el.onclick = () => setObjBrush(i);
@@ -1624,16 +1663,24 @@ function draw() {
     drawHdPieces();
     drawOpenAreas();
 
+    // pictures of the monsters and objects (game view), back to front
+    const pics = visible.objects && visible.pics !== false && view.iso && unitSheetReady();
+    if (pics) {
+        for (const o of [...map.objects].sort((a, b) => (a.x + a.y) - (b.x + b.y))) drawUnitPic(objName(o), o.type, (o.x + .5) / 5, (o.y + .5) / 5, o === selected ? 1 : .95);
+        if (tool === 'object' && objBrush && objBrush.type !== 3 && hover && inside(hover.x, hover.y) && !drag)
+            drawUnitPic(objBrush.raw, objBrush.type, (hover.sx + .5) / 5, (hover.sy + .5) / 5, .5);
+    }
     // objects (x/y in sub-tiles, 5 per tile)
     if (visible.objects) {
         for (const o of map.objects) {
             const [cx, cy] = proj((o.x + .5) / 5, (o.y + .5) / 5);
+            const hasPic = pics && unitPic(objName(o), o.type);
             if (o.paths && (o === selected)) {
                 ctx.strokeStyle = 'rgba(255,220,120,.8)'; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(cx, cy);
                 for (const p of o.paths) ctx.lineTo(...proj((p.x + .5) / 5, (p.y + .5) / 5));
                 ctx.stroke(); ctx.setLineDash([]);
             }
-            const rad = Math.max(3, Math.min(9, s * 0.2));
+            const rad = hasPic ? Math.max(2, Math.min(4, s * 0.08)) : Math.max(3, Math.min(9, s * 0.2));
             ctx.fillStyle = objColor(o);
             ctx.beginPath();
             if (o.type === 2) ctx.rect(cx - rad, cy - rad, rad * 2, rad * 2); else ctx.arc(cx, cy, rad, 0, Math.PI * 2);
@@ -1722,7 +1769,25 @@ function drawPic(pic, x, y, wall) {
     const z = view.cell / 80, e = pic.e;
     const [px, py] = proj(x, y);
     const dy = wall ? 80 : 0;
-    ctx.drawImage(pic.img, e[4], e[5], e[6], e[7], px - 80 * z + e[8] * z, py + (e[9] + dy) * z, e[6] * z, e[7] * z);
+    ctx.drawImage(bright(pic.img), e[4], e[5], e[6], e[7], px - 80 * z + e[8] * z, py + (e[9] + dy) * z, e[6] * z, e[7] * z);
+}
+// ------------------------------------------------------------------ brightness of the game's pictures
+// The classic tile and unit pictures are dark; a brightened copy of each picture sheet is made once
+// per brightness (drawing every tile through a canvas filter would be slow on big maps).
+let brightness = 1.3;
+try { const b = Number(localStorage.getItem('d2rme.brightness')); if (b >= 0.5 && b <= 2.5) brightness = b; } catch { }
+const brightCache = new Map();
+function bright(img) {
+    if (brightness === 1 || !img.complete || !img.naturalWidth) return img;
+    const c = brightCache.get(img);
+    if (c && c.b === brightness) return c.canvas;
+    const canvas = c ? c.canvas : document.createElement('canvas');
+    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+    const g = canvas.getContext('2d');
+    g.clearRect(0, 0, canvas.width, canvas.height);
+    g.filter = `brightness(${brightness})`; g.drawImage(img, 0, 0); g.filter = 'none';
+    brightCache.set(img, { b: brightness, canvas });
+    return canvas;
 }
 function drawIso(r) {
     const W = map.width, H = map.height, z = view.cell / 80;
@@ -1985,6 +2050,7 @@ function refreshLayers() {
     rows.push({ kind: 'objects', index: 0, label: 'Monsters & objects', key: 'objects' });
     if (map.hd) rows.push({ kind: 'hd', index: 0, label: 'HD pieces (cyan dots)', key: 'hd' });
     rows.push({ kind: 'walk', index: 0, label: 'Walkable in game (green) / blocked (red)', key: 'walk' });
+    if (window.GAME_UNITS) rows.push({ kind: 'pics', index: 0, label: 'Pictures of monsters & objects', key: 'pics' });
     for (const r of rows) {
         const key = r.key || layerKey(r);
         const el = document.createElement('div');
@@ -1993,7 +2059,7 @@ function refreshLayers() {
         cb.onclick = e => { e.stopPropagation(); visible[key] = cb.checked; if (key === 'walk') walkOn = cb.checked; render(); };
         el.appendChild(cb); el.appendChild(document.createTextNode(r.label));
         el.onclick = () => {
-            if (r.kind === 'hd' || r.kind === 'walk') { cb.click(); return; } // only a view toggle
+            if (r.kind === 'hd' || r.kind === 'walk' || r.kind === 'pics') { cb.click(); return; } // only a view toggle
             if (r.kind === 'objects') setTool('object');
             else { active = { kind: r.kind, index: r.index }; if (tool === 'object') setTool('paint'); refreshPalette(); }
             refreshLayers();
@@ -3397,6 +3463,43 @@ $('cBuild').onclick = async () => {
 
 // ------------------------------------------------------------------ start
 window.addEventListener('resize', resizeCanvas);
+
+// ------------------------------------------------------------------ panel sizes, map only, brightness
+// side panels: drag their inner edge to resize (or close), double-click it or Tab / ⛶ to hide both
+const layout = { lw: 250, rw: 270, hideL: false, hideR: false };
+try { Object.assign(layout, JSON.parse(localStorage.getItem('d2rme.layout') || '{}')); } catch { }
+function applyLayout(save = true) {
+    document.body.style.setProperty('--lw', (layout.hideL ? 0 : layout.lw) + 'px');
+    document.body.style.setProperty('--rw', (layout.hideR ? 0 : layout.rw) + 'px');
+    document.body.classList.toggle('collapsed-left', layout.hideL);
+    document.body.classList.toggle('collapsed-right', layout.hideR);
+    $('btnPanels').classList.toggle('on', layout.hideL && layout.hideR);
+    if (save) try { localStorage.setItem('d2rme.layout', JSON.stringify(layout)); } catch { }
+    resizeCanvas();
+}
+function splitter(el, side) {
+    el.addEventListener('pointerdown', e => {
+        e.preventDefault(); el.setPointerCapture(e.pointerId); el.classList.add('drag');
+        const move = ev => {
+            const w = side === 'L' ? ev.clientX : window.innerWidth - ev.clientX;
+            if (w < 60) { layout['hide' + side] = true; } // dragged to the edge: hidden
+            else { layout['hide' + side] = false; layout[side === 'L' ? 'lw' : 'rw'] = Math.max(170, Math.min(Math.round(window.innerWidth * .45), w)); }
+            applyLayout(false);
+        };
+        const up = () => { el.classList.remove('drag'); el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); applyLayout(); };
+        el.addEventListener('pointermove', move); el.addEventListener('pointerup', up);
+    });
+    el.addEventListener('dblclick', () => { layout['hide' + side] = !layout['hide' + side]; applyLayout(); });
+}
+splitter($('splitL'), 'L'); splitter($('splitR'), 'R');
+const toggleMapOnly = () => { const both = layout.hideL && layout.hideR; layout.hideL = layout.hideR = !both; applyLayout(); };
+$('btnPanels').onclick = toggleMapOnly;
+window.addEventListener('keydown', e => {
+    if (e.key === 'Tab' && !(e.target instanceof Element && e.target.matches('input, select, textarea, button')) && !document.querySelector('dialog[open]')) { e.preventDefault(); toggleMapOnly(); }
+});
+$('bright').value = brightness;
+$('bright').oninput = e => { brightness = Number(e.target.value); try { localStorage.setItem('d2rme.brightness', brightness); } catch { } render(); };
+applyLayout(false);
 setTool(HD_SAFE ? 'object' : 'paint'); updateButtons(); resizeCanvas();
 </script>
 </body>
